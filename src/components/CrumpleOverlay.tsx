@@ -1,27 +1,20 @@
+// components/crumpleOverlay.tsx
 import React from 'react';
 
 interface CrumpleOverlayProps {
-  intensity: number;
+  imageSrc: string;
+  alt: string;
 }
 
-const CrumpleOverlay: React.FC<CrumpleOverlayProps> = ({ intensity }) => {
-  const textureUrl = '/crumple-texture.jpg'; // Replace with the actual path to your texture image
-
+const CrumpleOverlay: React.FC<CrumpleOverlayProps> = ({ imageSrc, alt }) => {
   return (
-    <div
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        backgroundImage: `url(${textureUrl})`,
-        backgroundSize: 'cover',
-        opacity: intensity,
-        mixBlendMode: 'overlay', // You can experiment with other blend modes
-        pointerEvents: 'none', // Make sure it doesn't block clicks on the image
-      }}
-    />
+    <div className="relative inline-block">
+      <img src={imageSrc} alt={alt} className="w-full h-auto" />
+      <div
+        className="absolute inset-0 bg-cover bg-center pointer-events-none"
+        style={{ backgroundImage: 'url(/crumpled-paper.png)' }}
+      ></div>
+    </div>
   );
 };
 
