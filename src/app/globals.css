@@ -1,0 +1,138 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif; /* Using Inter font from layout */
+  overflow-x: hidden;
+}
+
+@layer base {
+  :root {
+    /* Light Theme - Adjusted based on User Request */
+    --background: 210 40% 98%; /* light grey */
+    --foreground: 222.2 47.4% 11.2%; /* dark grey */
+
+    --card: 0 0% 100%; /* White card */
+    --card-foreground: 222.2 47.4% 11.2%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+
+    --primary: 210 100% 65%; /* Muted blue #77B5FE */
+    --primary-foreground: 222.2 47.4% 11.2%; /* Dark text on primary */
+
+    --secondary: 210 40% 96.1%; /* Lighter grey */
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 20.2% 65.1%; /* Medium gray */
+
+    --accent: 210 100% 90%; /* Lighter blue */
+    --accent-foreground: 210 100% 40%; /* Darker Blue */
+
+    --destructive: 0 84.2% 60.2%; /* Standard red */
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 214.3 31.8% 91.4%; /* Light gray border */
+    --input: 214.3 31.8% 91.4%; /* Slightly off-white input */
+    --ring: 210 100% 55%; /* Blue ring */
+
+    --chart-1: 210 100% 65%; /* Blue */
+    --chart-2: 160 60% 60%; /* Teal */
+    --chart-3: 30 80% 65%; /* Orange */
+    --chart-4: 280 65% 70%; /* Purple */
+    --chart-5: 0 70% 65%;   /* Red */
+
+    --radius: 0.5rem; /* Standard radius */
+
+    /* Sidebar specific (If needed, otherwise defaults apply) */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222.2 47.4% 11.2%;
+    --sidebar-primary: 210 100% 65%;
+    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
+    --sidebar-accent: 210 100% 90%;
+    --sidebar-accent-foreground: 210 100% 40%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 210 100% 55%;
+  }
+
+  .dark {
+     /* Dark Theme - Keeping the blue focus */
+    --background: 224 71% 4%; /* Very Dark Blue */
+    --foreground: 213 31% 91%; /* Light Cool Gray */
+
+    --card: 224 71% 9%; /* Darker Blue-Gray */
+    --card-foreground: 213 31% 91%;
+
+    --popover: 224 71% 9%;
+    --popover-foreground: 213 31% 91%;
+
+    --primary: 210 100% 65%; /* Muted blue #77B5FE */
+    --primary-foreground: 222.2 47.4% 11.2%; /* Dark text */
+
+    --secondary: 215 28% 17%; /* Medium Dark Blue-Gray */
+    --secondary-foreground: 213 31% 91%;
+
+    --muted: 215 28% 17%;
+    --muted-foreground: 215.4 16.3% 56.9%; /* Lighter muted text */
+
+    --accent: 210 100% 20%; /* Darker blue */
+    --accent-foreground: 210 100% 90%; /* Lighter accent text */
+
+    --destructive: 0 62.8% 30.6%; /* Darker Red */
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 215 28% 17%; /* Darker gray border */
+    --input: 215 28% 17%; /* Darker input */
+    --ring: 210 100% 55%; /* Blue ring */
+
+    --chart-1: 210 100% 65%; /* Blue */
+    --chart-2: 160 60% 60%; /* Teal */
+    --chart-3: 30 80% 65%; /* Orange */
+    --chart-4: 280 65% 70%; /* Purple */
+    --chart-5: 0 70% 65%;   /* Red */
+
+    /* Sidebar specific (Dark) */
+    --sidebar-background: 224 71% 9%;
+    --sidebar-foreground: 213 31% 91%;
+    --sidebar-primary: 210 100% 65%;
+    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
+    --sidebar-accent: 210 100% 20%;
+    --sidebar-accent-foreground: 210 100% 90%;
+    --sidebar-border: 215 28% 17%;
+    --sidebar-ring: 210 100% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+
+/* Updated paper tremble animation with increased intensity */
+@layer utilities {
+   .animate-paper-tremble {
+     /* Default duration - can be overridden by inline style */
+     animation: paper-tremble 1.5s infinite ease-in-out alternate;
+     /* Ensures the transform origin is the center */
+     transform-origin: center center;
+  }
+
+  @keyframes paper-tremble {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    15% { transform: translate(-1px, 1px) rotate(-0.2deg); } /* Increased values */
+    30% { transform: translate(1px, -1px) rotate(0.3deg); } /* Increased values */
+    45% { transform: translate(-1.5px, 0.5px) rotate(-0.1deg); } /* Increased values */
+    60% { transform: translate(0.5px, -1.5px) rotate(0.1deg); } /* Increased values */
+    75% { transform: translate(-1px, 1px) rotate(-0.2deg); } /* Increased values */
+    90% { transform: translate(1.5px, -0.5px) rotate(0.2deg); } /* Increased values */
+    100% { transform: translate(0, 0) rotate(0deg); }
+  }
+}
