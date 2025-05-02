@@ -1,4 +1,3 @@
-
 "use client";
 
 import type React from 'react';
@@ -25,22 +24,22 @@ const MAX_BORDER_WIDTH_RATIO = 0.15; // Maximum border width relative to image s
 
 // Helper function to convert hex color and opacity to rgba string
 const hexToRgba = (hex: string, alpha: number): string => {
-    let r = 0, g = 0, b = 0;
-    const validHex = isValidHexColor(hex) ? hex : '#000000'; // Fallback to black if invalid
+  let r = 0, g = 0, b = 0;
+  const validHex = isValidHexColor(hex) ? hex : '#000000'; // Fallback to black if invalid
 
-    if (validHex.length === 4) { // #RGB
-        r = parseInt(validHex[1] + validHex[1], 16);
-        g = parseInt(validHex[2] + validHex[2], 16);
-        b = parseInt(validHex[3] + validHex[3], 16);
-    } else if (validHex.length === 7) { // #RRGGBB
-        r = parseInt(validHex.substring(1, 3), 16);
-        g = parseInt(validHex.substring(3, 5), 16);
-        b = parseInt(validHex.substring(5, 7), 16);
-    }
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  if (validHex.length === 4) { // #RGB
+    r = parseInt(validHex[1] + validHex[1], 16);
+    g = parseInt(validHex[2] + validHex[2], 16);
+    b = parseInt(validHex[3] + validHex[3], 16);
+  } else if (validHex.length === 7) { // #RRGGBB
+    r = parseInt(validHex.substring(1, 3), 16);
+    g = parseInt(validHex.substring(3, 5), 16);
+    b = parseInt(validHex.substring(5, 7), 16);
+  }
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-
+// Make sure to export the component!
 export function TornImage({
   svgRef,
   imageUrl,
@@ -71,7 +70,6 @@ export function TornImage({
     return Math.max(1, Math.round(Math.min(imageWidth, imageHeight) * borderWidthRatio));
   }, [imageWidth, imageHeight, borderWidthRatio]);
 
-
   // --- Tear Effect Calculation (applied to border) ---
   const safeTearAmount = Math.max(0, Math.min(100, tearAmount));
   const tearTurbulenceFrequency = Math.max(0.001, 0.005 + Math.pow(safeTearAmount / 100, 1.5) * 0.05);
@@ -90,12 +88,12 @@ export function TornImage({
 
   // --- Padding Calculation ---
   const padding = useMemo(() => {
-     // If no border, padding only needs to account for shadow
-     if (borderWidth === 0) {
-        return Math.max(Math.abs(shadowOffsetX) + shadowBlur * 2, Math.abs(shadowOffsetY) + shadowBlur * 2, 10) + 5;
-     }
-     // If border exists, consider border, shadow, and tear displacement
-     return Math.max(
+    // If no border, padding only needs to account for shadow
+    if (borderWidth === 0) {
+      return Math.max(Math.abs(shadowOffsetX) + shadowBlur * 2, Math.abs(shadowOffsetY) + shadowBlur * 2, 10) + 5;
+    }
+    // If border exists, consider border, shadow, and tear displacement
+    return Math.max(
       borderWidth * 1.5,
       Math.abs(shadowOffsetX) + shadowBlur * 2,
       Math.abs(shadowOffsetY) + shadowBlur * 2, // Add Y offset consideration
@@ -112,24 +110,59 @@ export function TornImage({
   const viewBoxWidth = totalWidth + padding * 2;
   const viewBoxHeight = totalHeight + padding * 2;
 
-
   const svgDefs = useMemo(() => {
     // No need for complex SVG filters if edgeThickness is 0
     if (borderWidth === 0) return null;
 
     return (
       <defs>
+        {/* Define clip path based on the image */}
+        <clipPath id={`image-clip-${filterIdBase}`}>
+          <image
+            x={padding + borderWidth}
+            y={padding + borderWidth}
+            width={imageWidth}
+            height={imageHeight}
+            href={imageUrl}
+          />
+        </clipPath>
+
         <filter
           id={combinedFilterId}
-          x={`-${(padding / viewBoxWidth) * 100}%`} // Use viewBox dimensions for percentage calculation
+          x={`-${(padding / viewBoxWidth) * 100}%`}
           y={`-${(padding / viewBoxHeight) * 100}%`}
-          width={`${(viewBoxWidth) / totalWidth * 100}%`} // Width relative to the border rect's size (totalWidth)
-          height={`${(viewBoxHeight) / totalHeight * 100}%`} // Height relative to the border rect's size (totalHeight)
-          filterUnits="userSpaceOnUse" // Use objectBoundingBox if percentages are tricky
+          width={`${(viewBoxWidth) / totalWidth * 100}%`}
+          height={`${(viewBoxHeight) / totalHeight * 100}%`}
+          filterUnits="userSpaceOnUse"
           colorInterpolationFilters="sRGB"
         >
-          {/* === Tear Effect Chain (operates on the white rect input) === */}
-          {/* 1a. Turbulence for Tear Displacement */}
+          {/* === Extract Alpha Channel from Image === */}
+          <feImage
+            href={imageUrl}
+            x={padding + borderWidth}
+            y={padding + borderWidth}
+            width={imageWidth}
+            height={imageHeight}
+            result="sourceImage"
+          />
+          
+          {/* Extract alpha channel and dilate it to create border area */}
+          <feComponentTransfer in="sourceImage" result="alphaChannel">
+            <feFuncR type="linear" slope="0" intercept="0"/>
+            <feFuncG type="linear" slope="0" intercept="0"/>
+            <feFuncB type="linear" slope="0" intercept="0"/>
+            <feFuncA type="linear" slope="1" intercept="0"/>
+          </feComponentTransfer>
+          
+          {/* Dilate the alpha channel to create border area */}
+          <feMorphology 
+            in="alphaChannel" 
+            operator="dilate" 
+            radius={borderWidth} 
+            result="dilatedAlpha"
+          />
+
+          {/* === Tear Effect Chain === */}
           <feTurbulence
             type="fractalNoise"
             baseFrequency={`${tearTurbulenceFrequency} ${tearTurbulenceFrequency * 0.5}`}
@@ -137,58 +170,77 @@ export function TornImage({
             seed={tearSeed}
             result="tearTurbulenceMap"
           />
-          {/* 1b. Displace Alpha Channel of the white rect for Torn Shape */}
+          
+          {/* Apply displacement to the dilated alpha for torn effect */}
           <feDisplacementMap
-            in="SourceAlpha" // Alpha of the white <rect> the filter is applied to
+            in="dilatedAlpha"
             in2="tearTurbulenceMap"
             scale={tearDisplacementScale}
             xChannelSelector="R"
             yChannelSelector="A"
-            result="tornAlphaMask" // Output: Alpha mask with torn edges for the border shape
+            result="tornMask"
           />
 
-          {/* === Shadow Generation (based on torn border mask) === */}
-           {/* 2a. Create the shadow color/opacity source */}
-            <feFlood floodColor={safeShadowColor} floodOpacity={shadowOpacity} result="shadowColorFlood"/>
-           {/* 2b. Use the torn mask shape for the shadow color */}
-           <feComposite in="shadowColorFlood" in2="tornAlphaMask" operator="in" result="coloredMask"/>
-           {/* 2c. Offset the colored mask */}
-           <feOffset in="coloredMask" dx={shadowOffsetX} dy={shadowOffsetY} result="offsetColoredMask"/>
-           {/* 2d. Blur the offset colored mask to create the shadow */}
-            <feGaussianBlur in="offsetColoredMask" stdDeviation={shadowBlur} result="shadowGraphicBlurred"/>
+          {/* === Create outer border only === */}
+          {/* Subtract original alpha from torn dilated alpha to get just the border area */}
+          <feComposite
+            in="tornMask"
+            in2="alphaChannel"
+            operator="out"
+            result="borderOnlyMask"
+          />
 
-          {/* === Torn White Border Generation === */}
-           {/* 3a. Create a solid white source */}
-           <feFlood floodColor="#FFFFFF" result="whiteFlood"/>
-           {/* 3b. Use the torn mask shape to cut out the white color */}
-           <feComposite in="whiteFlood" in2="tornAlphaMask" operator="in" result="tornWhiteGraphic"/>
+          {/* === Shadow Generation === */}
+          <feFlood floodColor={safeShadowColor} floodOpacity={shadowOpacity} result="shadowColorFlood"/>
+          <feComposite in="shadowColorFlood" in2="borderOnlyMask" operator="in" result="coloredMask"/>
+          <feOffset in="coloredMask" dx={shadowOffsetX} dy={shadowOffsetY} result="offsetColoredMask"/>
+          <feGaussianBlur in="offsetColoredMask" stdDeviation={shadowBlur} result="shadowGraphicBlurred"/>
 
-          {/* === Final Composite (Merge shadow UNDER the torn white border) === */}
-            <feMerge>
-                <feMergeNode in="shadowGraphicBlurred" /> {/* Shadow layer (bottom) */}
-                <feMergeNode in="tornWhiteGraphic" />      {/* Torn white border layer (top) */}
-            </feMerge>
+          {/* === Border Generation === */}
+          <feFlood floodColor="#FFFFFF" result="whiteFlood"/>
+          <feComposite in="whiteFlood" in2="borderOnlyMask" operator="in" result="whiteBorder"/>
+
+          {/* === Final Composite (Shadow under border) === */}
+          <feMerge>
+            <feMergeNode in="shadowGraphicBlurred" />
+            <feMergeNode in="whiteBorder" />
+          </feMerge>
         </filter>
       </defs>
     );
   }, [
-    borderWidth, // Add borderWidth to dependencies
+    borderWidth,
     combinedFilterId,
-    padding, totalWidth, totalHeight, viewBoxWidth, viewBoxHeight, // Updated dimension dependencies
-    shadowOffsetX, shadowOffsetY, shadowBlur, safeShadowColor, shadowOpacity,
-    tearTurbulenceFrequency, tearNumOctaves, tearSeed, tearDisplacementScale, // Tear params
+    filterIdBase,
+    imageUrl,
+    imageWidth,
+    imageHeight,
+    padding,
+    totalWidth,
+    totalHeight,
+    viewBoxWidth,
+    viewBoxHeight,
+    shadowOffsetX,
+    shadowOffsetY,
+    shadowBlur,
+    safeShadowColor,
+    shadowOpacity,
+    tearTurbulenceFrequency,
+    tearNumOctaves,
+    tearSeed,
+    tearDisplacementScale,
   ]);
 
   // --- CSS Drop Shadow (for borderless case) ---
-   const cssDropShadowStyle = useMemo(() => {
+  const cssDropShadowStyle = useMemo(() => {
     if (borderWidth > 0 || safeShadowIntensity <= 0) return {}; // Only apply if border is 0 and shadow intensity > 0
     const shadowColorRgba = hexToRgba(safeShadowColor, shadowOpacity);
-     return {
-       filter: `drop-shadow(${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px ${shadowColorRgba})`,
-       // Position the image within the SVG considering padding
-       transform: `translate(${padding}px, ${padding}px)`,
-     };
-   }, [borderWidth, safeShadowIntensity, shadowOffsetX, shadowOffsetY, shadowBlur, safeShadowColor, shadowOpacity, padding]);
+    return {
+      filter: `drop-shadow(${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px ${shadowColorRgba})`,
+      // Position the image within the SVG considering padding
+      transform: `translate(${padding}px, ${padding}px)`,
+    };
+  }, [borderWidth, safeShadowIntensity, shadowOffsetX, shadowOffsetY, shadowBlur, safeShadowColor, shadowOpacity, padding]);
 
   return (
     <svg
@@ -201,27 +253,28 @@ export function TornImage({
       xmlns="http://www.w3.org/2000/svg"
       xmlnsXlink="http://www.w3.org/1999/xlink"
       // Constrain SVG display size
-       style={{
-         maxWidth: `${viewBoxWidth}px`,
-         maxHeight: `${viewBoxHeight}px`,
-         overflow: 'visible'
-       }}
+      style={{
+        maxWidth: `${viewBoxWidth}px`,
+        maxHeight: `${viewBoxHeight}px`,
+        overflow: 'visible'
+      }}
     >
       {svgDefs}
 
       {/* Render based on whether border exists */}
       {borderWidth > 0 ? (
         <>
-          {/* 1. Draw the white rectangle that will become the torn border */}
+          {/* 1. Apply the filter to a rectangle that covers the image area */}
           <rect
             x={padding}
             y={padding}
             width={totalWidth}
             height={totalHeight}
-            fill="white" // Base fill color
-            filter={`url(#${combinedFilterId})`} // Apply the filter to this rect
+            fill="white"
+            filter={`url(#${combinedFilterId})`}
           />
-          {/* 2. Draw the original image on top, positioned inside the border */}
+          
+          {/* 2. Draw the original image on top */}
           <image
             x={padding + borderWidth}
             y={padding + borderWidth}
@@ -234,18 +287,18 @@ export function TornImage({
       ) : (
         /* Render only the image with CSS drop-shadow if no border */
         <image
-            // Note: x/y positioning is handled by the cssDropShadowStyle transform
-            // x={padding}
-            // y={padding}
-            width={imageWidth}
-            height={imageHeight}
-            href={imageUrl}
-            style={{
-              imageRendering: 'auto',
-              ...cssDropShadowStyle, // Apply drop-shadow via style
-            }}
-         />
+          width={imageWidth}
+          height={imageHeight}
+          href={imageUrl}
+          style={{
+            imageRendering: 'auto',
+            ...cssDropShadowStyle,
+          }}
+        />
       )}
     </svg>
   );
 }
+
+// To ensure the module has a default export too (optional)
+export default TornImage;

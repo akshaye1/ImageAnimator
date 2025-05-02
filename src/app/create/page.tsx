@@ -459,7 +459,7 @@ export default function CreatePage() {
                     value={[tearAmount]}
                     onValueChange={(value) => setTearAmount(value[0])}
                     disabled={!imageDetails || isProcessing}
-                    className="[&>span>span]:bg-primary [&>span]:bg-accent"
+                    className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
                    />
                 </div>
 
@@ -475,7 +475,7 @@ export default function CreatePage() {
                     value={[edgeThickness]}
                     onValueChange={(value) => setEdgeThickness(value[0])}
                     disabled={!imageDetails || isProcessing}
-                    className="[&>span>span]:bg-primary [&>span]:bg-accent"
+                    className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
                    />
                  </div>
 
@@ -491,7 +491,7 @@ export default function CreatePage() {
                     value={[shadowIntensity]}
                     onValueChange={(value) => setShadowIntensity(value[0])}
                     disabled={!imageDetails || isProcessing}
-                    className="[&>span>span]:bg-primary [&>span]:bg-accent"
+                    className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
                    />
                  </div>
 
@@ -506,7 +506,7 @@ export default function CreatePage() {
                     value={[shadowDirection]}
                     onValueChange={(value) => setShadowDirection(value[0])}
                     disabled={!imageDetails || isProcessing}
-                     className="[&>span>span]:bg-primary [&>span]:bg-accent"
+                     className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
                    />
                  </div>
 
@@ -557,7 +557,7 @@ export default function CreatePage() {
                     value={[animationIntensity]}
                     onValueChange={(value) => setAnimationIntensity(value[0])}
                     disabled={!imageDetails || isProcessing}
-                    className="[&>span>span]:bg-primary [&>span]:bg-accent"
+                    className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
                    />
                    <p className="text-xs text-muted-foreground">Higher value means faster animation. 0 disables animation.</p>
                  </div>
