@@ -1,6 +1,6 @@
 // components/crumpleOverlay.tsx
 import React, { useEffect, useRef, ReactNode, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
 interface CrumpleOverlayProps {
   imageSrc: string;
@@ -17,7 +17,7 @@ const CrumpleOverlay: React.FC<CrumpleOverlayProps> = ({
   alt,
   intensity = 0.5,
   animationIntensity = 0.5,
-  textureOptions = ["/studio-master/crumpled-craft-beige-paper.jpg"], // Updated path to match the file location
+  textureOptions = ["/crumpled-craft-beige-paper.jpg"], // Corrected path for public directory
   className,
   children,
 }) => {

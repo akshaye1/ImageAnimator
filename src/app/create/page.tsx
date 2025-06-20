@@ -1,50 +1,40 @@
-"use client";
-
-import type React from "react";
-import { useState, useRef, useCallback, useMemo } from "react";
-import { ImageUpload } from "@/components/image-upload";
-import { TornImage } from "@/components/torn-image";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Download,
-  UploadCloud,
-  Settings,
-  RotateCw,
-  Palette,
-  Zap,
-  Video,
-  Image as ImageIcon,
-  X,
-  Loader2,
-  MoveHorizontal,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import { saveAs } from "file-saver";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import {
+  Button,
+  Card,
+  CardContent,
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress"; // Import Progress component
-import CrumpleOverlay from "@/components/CrumpleOverlay";
+  ImageUpload,
+  Input,
+  Label,
+  Loader2,
+  Palette,
+  Progress,
+  RotateCw,
+  Settings,
+  UploadCloud,
+  Video,
+  Zap,
+} from "@/components/ui";
+import TornImage from "@/components/TornImage";
+
+// Basic hex color validation (allows #rgb and #rrggbb)
+const isValidHexColor = (color: string): boolean =>
+  /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color);
 
 interface ImageDetails {
   url: string;
   width: number;
   height: number;
 }
-
-// Basic hex color validation (allows #rgb and #rrggbb)
-const isValidHexColor = (color: string): boolean =>
-  /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color);
 
 export default function CreatePage() {
   const [imageDetails, setImageDetails] = useState<ImageDetails | null>(null);
@@ -68,10 +58,6 @@ export default function CreatePage() {
   const videoCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const recordingStartTimeRef = useRef<number | null>(null);
   const recordingDuration = 5000; // 5 seconds
-  const [crumpleIntensity, setCrumpleIntensity] = useState<number>(50);
-  const [crumpleAnimationIntensity, setCrumpleAnimationIntensity] =
-    useState<number>(30);
-  const [originalFile, setOriginalFile] = useState<File | null>(null);
 
   const handleImageUpload = useCallback(
     (imageDataUrl: string, width: number, height: number) => {
@@ -92,7 +78,7 @@ export default function CreatePage() {
   }, []);
 
   const handlePngDownload = async () => {
-    if (!imageDetails || !svgRef.current || !previewContainerRef.current) {
+    if (!imageDetails || !imageDetails.url) {
       toast({
         title: "No Image",
         description: "Please upload an image first.",
@@ -104,107 +90,51 @@ export default function CreatePage() {
     setIsDownloadDialogOpen(false);
     toast({
       title: "Preparing PNG Download",
-      description: "Generating static image, please wait...",
+      description: "Generating torn border image, please wait...",
     });
 
-    const previewContainer = previewContainerRef.current;
-    const svgElement = svgRef.current;
-    const initialClasses = previewContainer.className;
-    const initialInlineStyle = previewContainer.style.cssText;
-
     try {
-      previewContainer.classList.remove("animate-paper-tremble");
-      previewContainer.style.animationDuration = "";
+      // Fetch the image blob from the data URL
+      const response = await fetch(imageDetails.url);
+      const blob = await response.blob();
+      const formData = new FormData();
+      formData.append("file", blob, "image.png");
+      formData.append("tearAmount", tearAmount.toString());
+      formData.append("shadowDirection", shadowDirection.toString());
+      formData.append("shadowIntensity", shadowIntensity.toString());
+      formData.append("shadowColor", shadowColor);
+      formData.append("edgeThickness", edgeThickness.toString());
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const svgString = new XMLSerializer().serializeToString(svgElement);
-      const svgBlob = new Blob([svgString], {
-        type: "image/svg+xml;charset=utf-8",
-      });
-      const svgUrl = URL.createObjectURL(svgBlob);
-
-      const img = new Image();
-
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const viewBox = svgElement.viewBox?.baseVal;
-        if (!viewBox) {
-          toast({
-            title: "Download Error",
-            description: "Could not get SVG dimensions.",
-            variant: "destructive",
-          });
-          URL.revokeObjectURL(svgUrl);
-          previewContainer.className = initialClasses;
-          previewContainer.style.cssText = initialInlineStyle;
-          setIsDownloadingPng(false);
-          return;
+      const backendRes = await fetch(
+        "http://localhost:5000/images/torn_border",
+        {
+          method: "POST",
+          body: formData,
         }
-        canvas.width = viewBox.width;
-        canvas.height = viewBox.height;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          toast({
-            title: "Download Error",
-            description: "Could not get canvas context.",
-            variant: "destructive",
-          });
-          URL.revokeObjectURL(svgUrl);
-          previewContainer.className = initialClasses;
-          previewContainer.style.cssText = initialInlineStyle;
-          setIsDownloadingPng(false);
-          return;
-        }
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        canvas.toBlob((blob) => {
-          if (blob) {
-            saveAs(blob, "torn-border-image.png"); // Updated filename
-            toast({
-              title: "Download Started",
-              description: "Your static PNG image is downloading.",
-            });
-          } else {
-            toast({
-              title: "Download Error",
-              description: "Could not generate image blob.",
-              variant: "destructive",
-            });
-          }
-          URL.revokeObjectURL(svgUrl);
-          previewContainer.className = initialClasses;
-          previewContainer.style.cssText = initialInlineStyle;
-          setIsDownloadingPng(false);
-        }, "image/png");
-      };
-
-      img.onerror = (error) => {
-        console.error("Image load error from SVG:", error);
+      );
+      if (!backendRes.ok) {
+        const errorText = await backendRes.text();
         toast({
-          title: "Download Error",
-          description: "Could not load the generated SVG image.",
+          title: "Backend Error",
+          description: errorText,
           variant: "destructive",
         });
-        URL.revokeObjectURL(svgUrl);
-        previewContainer.className = initialClasses;
-        previewContainer.style.cssText = initialInlineStyle;
         setIsDownloadingPng(false);
-      };
-
-      img.src = svgUrl;
+        return;
+      }
+      const resultBlob = await backendRes.blob();
+      saveAs(resultBlob, "torn-border-image.png");
+      toast({
+        title: "Download Started",
+        description: "Your torn border PNG image is downloading.",
+      });
     } catch (error) {
-      console.error("Download error:", error);
       toast({
         title: "Download Failed",
-        description: "An unexpected error occurred during SVG processing.",
+        description: "An error occurred during backend processing.",
         variant: "destructive",
       });
-      previewContainer.className = initialClasses;
-      previewContainer.style.cssText = initialInlineStyle;
+    } finally {
       setIsDownloadingPng(false);
     }
   };
@@ -278,6 +208,7 @@ export default function CreatePage() {
       return;
     }
 
+    // Pre-render the SVG to an Image object to draw onto the canvas repeatedly
     const svgString = new XMLSerializer().serializeToString(svgElement);
     const svgBlob = new Blob([svgString], {
       type: "image/svg+xml;charset=utf-8",
@@ -286,15 +217,16 @@ export default function CreatePage() {
     const img = new Image();
 
     img.onload = () => {
-      URL.revokeObjectURL(svgUrl);
+      URL.revokeObjectURL(svgUrl); // Clean up object URL once image is loaded
 
+      // Determine MIME type and file extension
       const mimeType = MediaRecorder.isTypeSupported("video/mp4;codecs=avc1")
         ? "video/mp4"
         : MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
         ? "video/webm"
         : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
         ? "video/webm"
-        : "video/webm";
+        : "video/webm"; // Default fallback
       const fileExtension = mimeType.startsWith("video/mp4") ? "mp4" : "webm";
       const videoFileName = `torn-border-animation.${fileExtension}`; // Updated filename
 
@@ -309,7 +241,7 @@ export default function CreatePage() {
       const stream = canvas.captureStream(30); // Capture at 30 FPS
       try {
         // Increased bitrate for better quality
-        const options = { mimeType, videoBitsPerSecond: 8000000 };
+        const options = { mimeType, videoBitsPerSecond: 8000000 }; // 8 Mbps
         mediaRecorderRef.current = new MediaRecorder(stream, options);
       } catch (e) {
         console.error("MediaRecorder Error:", e);
@@ -319,7 +251,7 @@ export default function CreatePage() {
           variant: "destructive",
         });
         setIsRecordingVideo(false);
-        videoCanvasRef.current = null;
+        videoCanvasRef.current = null; // Clean up canvas ref
         return;
       }
 
@@ -354,8 +286,9 @@ export default function CreatePage() {
           });
         }
 
+        // Cleanup after stopping
         setIsRecordingVideo(false);
-        setRecordingProgress(100);
+        setRecordingProgress(100); // Indicate completion
         videoCanvasRef.current = null;
         mediaRecorderRef.current = null;
         recordingStartTimeRef.current = null;
@@ -373,6 +306,7 @@ export default function CreatePage() {
           variant: "destructive",
         });
 
+        // Cleanup on error
         setIsRecordingVideo(false);
         setRecordingProgress(0);
         videoCanvasRef.current = null;
@@ -393,7 +327,9 @@ export default function CreatePage() {
       }); // Updated message
       recordingStartTimeRef.current = performance.now();
 
+      // Animation loop to draw frames onto the canvas
       const drawFrame = (timestamp: number) => {
+        // Check if recording should continue
         if (
           !mediaRecorderRef.current ||
           mediaRecorderRef.current.state !== "recording"
@@ -402,12 +338,14 @@ export default function CreatePage() {
           if (animationFrameIdRef.current)
             cancelAnimationFrame(animationFrameIdRef.current);
           animationFrameIdRef.current = null;
+          // Ensure recorder is stopped if it wasn't already (e.g., due to an error)
           if (
             mediaRecorderRef.current &&
             mediaRecorderRef.current.state === "recording"
           ) {
             mediaRecorderRef.current.stop();
           } else if (!mediaRecorderRef.current && isRecordingVideo) {
+            // If recorder is already null but state is still recording, clean up state
             setIsRecordingVideo(false);
             setRecordingProgress(100);
           }
@@ -424,6 +362,7 @@ export default function CreatePage() {
         );
         setRecordingProgress(progress);
 
+        // Stop recording if duration is reached
         if (elapsed >= recordingDuration) {
           console.log("Recording duration reached, stopping recorder.");
           stopRecording();
@@ -432,18 +371,24 @@ export default function CreatePage() {
 
         if (!videoCanvasRef.current || !ctx) return;
 
+        // --- Get current transform from the preview container ---
         const previewContainer = previewContainerRef.current;
         let transform = "none";
         if (previewContainer) {
           const currentStyle = window.getComputedStyle(previewContainer);
           transform = currentStyle.transform;
+          // console.log("Current Transform:", transform); // Debugging
         }
 
+        // --- Draw the image onto the canvas with the current transform ---
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.save();
+        ctx.save(); // Save context state
 
+        // Apply the captured transform to the canvas drawing
         try {
+          // Split transform matrix values (assuming 'matrix(a, b, c, d, e, f)')
           const matrix = new DOMMatrix(transform);
+          // Apply transform relative to the center of the canvas
           ctx.translate(canvas.width / 2, canvas.height / 2);
           ctx.transform(
             matrix.a,
@@ -455,16 +400,19 @@ export default function CreatePage() {
           );
           ctx.translate(-canvas.width / 2, -canvas.height / 2);
         } catch (e) {
+          // Fallback if transform parsing fails
           console.warn(
             "Could not parse transform matrix, drawing without transform.",
             e
           );
+          // Reset transform to identity if parsing failed
           ctx.setTransform(1, 0, 0, 1, 0, 0);
         }
 
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        ctx.restore();
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height); // Draw the pre-rendered SVG image
+        ctx.restore(); // Restore context state
 
+        // Request next frame if still recording
         if (mediaRecorderRef.current?.state === "recording") {
           animationFrameIdRef.current = requestAnimationFrame(drawFrame);
         } else {
@@ -472,6 +420,7 @@ export default function CreatePage() {
           if (animationFrameIdRef.current)
             cancelAnimationFrame(animationFrameIdRef.current);
           animationFrameIdRef.current = null;
+          // Ensure state is cleaned up if recorder stopped unexpectedly
           if (isRecordingVideo) {
             setRecordingProgress(100);
             setIsRecordingVideo(false);
@@ -479,11 +428,12 @@ export default function CreatePage() {
         }
       };
 
+      // Start the animation loop
       animationFrameIdRef.current = requestAnimationFrame(drawFrame);
     }; // End of img.onload
 
     img.onerror = () => {
-      URL.revokeObjectURL(svgUrl);
+      URL.revokeObjectURL(svgUrl); // Clean up object URL on error
       toast({
         title: "Recording Error",
         description: "Could not load the SVG image for recording.",
@@ -492,7 +442,7 @@ export default function CreatePage() {
       setIsRecordingVideo(false);
       setRecordingProgress(0);
     };
-    img.src = svgUrl;
+    img.src = svgUrl; // Start loading the SVG as an image
   };
 
   const handleDownloadClick = () => {
@@ -504,6 +454,7 @@ export default function CreatePage() {
       });
       return;
     }
+    // Validate hex color before opening dialog or downloading
     if (shadowColor && !isValidHexColor(shadowColor)) {
       toast({
         title: "Invalid Color",
@@ -514,8 +465,10 @@ export default function CreatePage() {
     }
 
     if (animationIntensity > 0) {
+      // If animation is active, show the dialog
       setIsDownloadDialogOpen(true);
     } else {
+      // If no animation, directly download PNG
       handlePngDownload();
     }
   };
@@ -527,67 +480,35 @@ export default function CreatePage() {
     setShadowColor("#000000");
     setEdgeThickness(5);
     setAnimationIntensity(50);
-    setCrumpleIntensity(50);
-    setCrumpleAnimationIntensity(30);
     toast({
       title: "Controls Reset",
       description: "All settings returned to default.",
     });
   };
 
+  // Handle manual hex color input
   const handleHexColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newColor = e.target.value;
+    // Basic validation or formatting could be added here if needed
     setShadowColor(newColor);
+    // // Check if valid only when focusing out or pressing enter?
+    // if (!isValidHexColor(newColor) && newColor !== '') {
+    //   // Optionally show inline error or just rely on the button disabling
+    // }
   };
 
+  // Calculate animation duration based on intensity
   const animationDuration = useMemo(() => {
-    if (animationIntensity <= 0) return "0s";
-    const maxDuration = 3;
-    const minDuration = 0.2;
-    // Inverse relationship: higher intensity = lower duration (faster animation)
+    if (animationIntensity <= 0) return "0s"; // No animation if intensity is 0
+    const maxDuration = 3; // Longest duration (slowest animation) at intensity 1
+    const minDuration = 0.2; // Shortest duration (fastest animation) at intensity 100
+    // Inverse relationship: higher intensity = lower duration
     const duration =
       maxDuration - (animationIntensity / 100) * (maxDuration - minDuration);
     return `${duration.toFixed(2)}s`;
   }, [animationIntensity]);
 
   const isProcessing = isDownloadingPng || isRecordingVideo;
-
-  const handleBackendPngDownload = async () => {
-    if (!originalFile) {
-      toast({
-        title: "No Image",
-        description: "Please upload an image first.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsDownloadingPng(true);
-    setIsDownloadDialogOpen(false);
-    try {
-      const formData = new FormData();
-      formData.append("file", originalFile);
-      formData.append("textureOpacity", crumpleIntensity.toString());
-
-      const res = await fetch("http://localhost:5000/images/add_border", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error("Backend error");
-      const blob = await res.blob();
-      saveAs(blob, "crumpled-image.png");
-      toast({
-        title: "Download Started",
-        description: "Your processed PNG image is downloading.",
-      });
-    } catch (e) {
-      toast({
-        title: "Download Error",
-        description: "Could not download processed image.",
-        variant: "destructive",
-      });
-    }
-    setIsDownloadingPng(false);
-  };
 
   return (
     <main className="container mx-auto flex min-h-screen flex-col items-center p-4 md:p-8 lg:p-12 bg-background overflow-x-hidden">
@@ -615,9 +536,8 @@ export default function CreatePage() {
                 onImageRemove={handleImageRemove}
                 isDragging={isDragging}
                 setIsDragging={setIsDragging}
-                disabled={isProcessing}
-                crumpleIntensity={crumpleIntensity}
-                onOriginalFile={setOriginalFile}
+                disabled={isProcessing} // Disable upload when processing
+                crumpleIntensity={0} // Add the missing prop
               />
             </CardContent>
           </Card>
@@ -633,6 +553,7 @@ export default function CreatePage() {
                   variant="ghost"
                   size="sm"
                   onClick={resetControls}
+                  disabled={isProcessing}
                   className="text-xs text-muted-foreground hover:text-primary"
                 >
                   <RotateCw className="mr-1 h-3 w-3" /> Reset
@@ -655,7 +576,8 @@ export default function CreatePage() {
                   value={[tearAmount]}
                   onValueChange={(value) => setTearAmount(value[0])}
                   disabled={!imageDetails || isProcessing}
-                  className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
+                  // Apply theme colors using CSS variables or Tailwind utility classes
+                  className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full" // Use theme colors
                 />
               </div>
 
@@ -666,6 +588,8 @@ export default function CreatePage() {
                   className="text-sm font-medium text-foreground flex items-center"
                 >
                   Border Thickness ({edgeThickness})
+                  {/* Optional: Add Icon for visual cue */}
+                  {/* <MoveHorizontal className="ml-2 h-4 w-4 text-muted-foreground"/> */}
                 </Label>
                 <Slider
                   id="edgeThickness"
@@ -675,8 +599,10 @@ export default function CreatePage() {
                   value={[edgeThickness]}
                   onValueChange={(value) => setEdgeThickness(value[0])}
                   disabled={!imageDetails || isProcessing}
-                  className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
+                  className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full" // Use theme colors
                 />
+                {/* Optional: Add description */}
+                {/* <p className="text-xs text-muted-foreground">Controls the width of the torn border. 0 means no border.</p> */}
               </div>
 
               {/* Shadow Intensity */}
@@ -695,7 +621,7 @@ export default function CreatePage() {
                   value={[shadowIntensity]}
                   onValueChange={(value) => setShadowIntensity(value[0])}
                   disabled={!imageDetails || isProcessing}
-                  className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
+                  className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full" // Use theme colors
                 />
               </div>
 
@@ -715,6 +641,7 @@ export default function CreatePage() {
                   value={[shadowDirection]}
                   onValueChange={(value) => setShadowDirection(value[0])}
                   disabled={!imageDetails || isProcessing}
+                  // Use theme colors for the slider track and thumb
                   className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
                 />
               </div>
@@ -729,17 +656,21 @@ export default function CreatePage() {
                   Shadow Color
                 </Label>
                 <div className="flex items-center gap-2">
+                  {/* Native Color Picker */}
                   <Input
                     id="shadowColorPicker"
                     type="color"
                     value={
                       isValidHexColor(shadowColor) ? shadowColor : "#000000"
+                    } // Bind to state, fallback if invalid
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setShadowColor(e.target.value)
                     }
-                    onChange={(e) => setShadowColor(e.target.value)}
                     disabled={!imageDetails || isProcessing}
-                    className="h-10 w-12 p-1 cursor-pointer disabled:cursor-not-allowed rounded-md border-input bg-input"
+                    className="h-10 w-12 p-1 cursor-pointer disabled:cursor-not-allowed rounded-md border-input bg-input" // Basic styling
                     aria-label="Choose shadow color"
                   />
+                  {/* Hex Input Field */}
                   <Input
                     id="shadowColorHex"
                     type="text"
@@ -748,14 +679,16 @@ export default function CreatePage() {
                     placeholder="#000000"
                     disabled={!imageDetails || isProcessing}
                     className={cn(
-                      "flex-1 h-10",
+                      "flex-1 h-10", // Make it fill remaining space
+                      // Add error styling if color is invalid and not empty
                       shadowColor &&
                         !isValidHexColor(shadowColor) &&
                         "border-destructive focus-visible:ring-destructive"
                     )}
-                    maxLength={7}
+                    maxLength={7} // Limit input length (#rrggbb)
                   />
                 </div>
+                {/* Optional: Display validation message */}
                 {shadowColor && !isValidHexColor(shadowColor) && (
                   <p className="text-xs text-destructive">
                     Invalid hex color format (use #rrggbb or #rgb)
@@ -774,13 +707,13 @@ export default function CreatePage() {
                 </Label>
                 <Slider
                   id="animationIntensity"
-                  min={0}
+                  min={0} // Allow disabling animation
                   max={100}
                   step={1}
                   value={[animationIntensity]}
                   onValueChange={(value) => setAnimationIntensity(value[0])}
                   disabled={!imageDetails || isProcessing}
-                  className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
+                  className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full" // Use theme colors
                 />
                 <p className="text-xs text-muted-foreground">
                   Higher value means faster animation. 0 disables animation.
@@ -788,104 +721,75 @@ export default function CreatePage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Crumple Effect Controls */}
-          <Card className="bg-card shadow-lg border-border">
-            <CardContent className="p-6 space-y-5">
-              <h2 className="text-xl font-semibold text-card-foreground mb-4 border-b pb-2 flex items-center">
-                <Zap className="mr-2 h-5 w-5 text-primary" />
-                Crumple Effect
-              </h2>
-
-              {/* Crumple Intensity */}
-              <div className="space-y-2">
-                <Label
-                  htmlFor="crumpleIntensity"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Crumple Intensity ({crumpleIntensity})
-                </Label>
-                <Slider
-                  id="crumpleIntensity"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={[crumpleIntensity]}
-                  onValueChange={(value) => setCrumpleIntensity(value[0])}
-                  disabled={!imageDetails || isProcessing}
-                  className="[&>span>span]:bg-primary [&>span]:bg-accent [&>span]:rounded-full"
-                />
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Right Column: Preview and Download */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Make the card sticky within its column */}
           <Card className="bg-card shadow-xl border-border sticky top-8">
             <CardContent className="p-6">
               <h2 className="text-xl font-semibold text-card-foreground mb-4 border-b pb-2">
                 Preview
               </h2>
               <div className="w-full min-h-[400px] flex justify-center items-center bg-secondary/50 rounded-lg p-4 border border-dashed border-border overflow-hidden">
+                {" "}
+                {/* Added overflow-hidden */}
                 {imageDetails ? (
                   <div
                     ref={previewContainerRef}
                     className={cn(
                       "max-w-full max-h-full flex justify-center items-center",
+                      // Apply animation class only if intensity > 0
                       animationIntensity > 0 && "animate-paper-tremble"
                     )}
+                    // Apply animation duration via inline style only if intensity > 0
                     style={
                       animationIntensity > 0
                         ? { animationDuration: animationDuration }
                         : { animation: "none" }
-                    }
+                    } // Only apply duration if intensity > 0
                   >
-                    <CrumpleOverlay
-                      imageSrc={imageDetails.url}
-                      alt="Preview"
-                      intensity={crumpleIntensity / 100}
-                      animationIntensity={crumpleAnimationIntensity / 100}
-                      className="w-full h-full"
-                    >
-                      <TornImage
-                        svgRef={svgRef}
-                        imageUrl={imageDetails.url}
-                        imageWidth={imageDetails.width}
-                        imageHeight={imageDetails.height}
-                        tearAmount={tearAmount}
-                        shadowDirection={shadowDirection}
-                        shadowIntensity={shadowIntensity}
-                        shadowColor={shadowColor}
-                        edgeThickness={edgeThickness}
-                        key={`${imageDetails.url}-${tearAmount}-${shadowDirection}-${shadowIntensity}-${shadowColor}-${edgeThickness}-${animationIntensity}-${imageDetails.width}-${imageDetails.height}`}
-                      />
-                    </CrumpleOverlay>
+                    {/* TornImage Component */}
+                    <TornImage
+                      svgRef={svgRef}
+                      imageUrl={imageDetails.url}
+                      imageWidth={imageDetails.width}
+                      imageHeight={imageDetails.height}
+                      tearAmount={tearAmount}
+                      shadowDirection={shadowDirection}
+                      shadowIntensity={shadowIntensity}
+                      shadowColor={shadowColor}
+                      edgeThickness={edgeThickness} // Pass edge thickness
+                      // Key needs to include relevant props that cause re-render of TornImage internals
+                      key={`${imageDetails.url}-${tearAmount}-${shadowDirection}-${shadowIntensity}-${shadowColor}-${edgeThickness}-${animationIntensity}-${imageDetails.width}-${imageDetails.height}`}
+                    />
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                  // Placeholder when no image is uploaded
+                  <div className="text-center text-muted-foreground p-10">
                     <UploadCloud
-                      className="w-10 h-10 mb-3 text-muted-foreground"
-                      strokeWidth={1.5}
+                      className="mx-auto mb-4 h-16 w-16 text-muted-foreground/70"
+                      strokeWidth={1}
                     />
-                    <p className="mb-1 text-sm font-medium text-foreground">
-                      Click to upload or drag & drop
+                    <p className="font-medium text-lg">
+                      Your masterpiece awaits!
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      PNG, JPG, WEBP supported
+                    <p className="text-sm">
+                      Upload an image to add a torn border.
                     </p>
                   </div>
                 )}
               </div>
+              {/* Download Button */}
               <Button
                 size="lg"
-                className="w-full mt-6 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-200 text-base font-semibold py-3 shadow-md hover:shadow-lg text-white"
+                className="w-full mt-6 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-200 text-base font-semibold py-3 shadow-md hover:shadow-lg text-white" // Enhanced styling
                 onClick={handleDownloadClick}
                 disabled={
                   !imageDetails ||
                   isProcessing ||
                   !!(shadowColor && !isValidHexColor(shadowColor))
-                }
+                } // Disable if no image, processing, or invalid color
               >
                 {isDownloadingPng ? (
                   <>
@@ -904,12 +808,14 @@ export default function CreatePage() {
                   </>
                 )}
               </Button>
+              {/* Progress Bar for Video Recording */}
               {isRecordingVideo && (
                 <Progress
                   value={recordingProgress}
                   className="w-full h-2 mt-2 [&>div]:bg-primary"
-                />
+                /> // Use theme color
               )}
+              {/* Help Text */}
               <p className="text-xs text-muted-foreground mt-2 text-center">
                 {animationIntensity > 0
                   ? "Animated images can be exported as MP4/WebM video or static PNG."
@@ -924,7 +830,11 @@ export default function CreatePage() {
         open={isDownloadDialogOpen}
         onOpenChange={(open) => !isProcessing && setIsDownloadDialogOpen(open)}
       >
+        {" "}
+        {/* Prevent closing while processing */}
         <DialogContent className="sm:max-w-[450px] bg-card text-card-foreground border-border">
+          {" "}
+          {/* Adjust width and apply theme */}
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-foreground">
               Choose Export Format
@@ -938,12 +848,15 @@ export default function CreatePage() {
             {/* Export as Video Button */}
             <Button
               variant="outline"
-              className="w-full justify-start p-4 h-auto border-border hover:bg-accent hover:text-accent-foreground flex items-center space-x-3 overflow-hidden group"
+              className="w-full justify-start p-4 h-auto border-border hover:bg-accent hover:text-accent-foreground flex items-center space-x-3 overflow-hidden group" // Improved styling
               onClick={handleVideoDownload}
-              disabled={isProcessing}
+              disabled={isProcessing} // Disable while processing
             >
-              <Video className="h-5 w-5 text-primary flex-shrink-0" />
+              <Video className="h-5 w-5 text-primary flex-shrink-0" />{" "}
+              {/* Icon */}
               <div className="text-left flex-grow min-w-0">
+                {" "}
+                {/* Allow text to shrink */}
                 <p className="font-medium text-foreground truncate">
                   Export as Video
                 </p>
@@ -953,18 +866,22 @@ export default function CreatePage() {
               </div>
               {isRecordingVideo && (
                 <Loader2 className="ml-auto h-4 w-4 animate-spin flex-shrink-0 text-primary group-hover:text-accent-foreground" />
-              )}
+              )}{" "}
+              {/* Spinner */}
             </Button>
 
             {/* Export as PNG Button */}
             <Button
               variant="outline"
-              className="w-full justify-start p-4 h-auto border-border hover:bg-accent hover:text-accent-foreground flex items-center space-x-3 overflow-hidden group"
-              onClick={handleBackendPngDownload}
-              disabled={isProcessing}
+              className="w-full justify-start p-4 h-auto border-border hover:bg-accent hover:text-accent-foreground flex items-center space-x-3 overflow-hidden group" // Improved styling
+              onClick={handlePngDownload}
+              disabled={isProcessing} // Disable while processing
             >
-              <ImageIcon className="h-5 w-5 text-primary flex-shrink-0" />
+              <ImageIcon className="h-5 w-5 text-primary flex-shrink-0" />{" "}
+              {/* Icon */}
               <div className="text-left flex-grow min-w-0">
+                {" "}
+                {/* Allow text to shrink */}
                 <p className="font-medium text-foreground truncate">
                   Export as transparent PNG
                 </p>
@@ -974,19 +891,23 @@ export default function CreatePage() {
               </div>
               {isDownloadingPng && (
                 <Loader2 className="ml-auto h-4 w-4 animate-spin flex-shrink-0 text-primary group-hover:text-accent-foreground" />
-              )}
+              )}{" "}
+              {/* Spinner */}
             </Button>
           </div>
+          {/* Cancel Button */}
           <DialogClose asChild>
             <Button
               variant="ghost"
               className="mt-2 text-sm text-muted-foreground"
+              disabled={isProcessing}
             >
               Cancel
             </Button>
           </DialogClose>
         </DialogContent>
       </Dialog>
+      {/* Footer */}
       <footer className="w-full max-w-5xl text-center mt-16 pt-8 border-t border-border">
         <p className="text-sm text-muted-foreground">
           TearDrop - Add unique torn borders to your images with ease.
