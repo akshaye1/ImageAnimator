@@ -1,8 +1,6 @@
-
 "use client";
 
-import type React from "react";
-import { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -16,17 +14,48 @@ interface ImageUploadProps {
   onImageRemove: () => void;
   isDragging: boolean;
   setIsDragging: (isDragging: boolean) => void;
-  disabled?: boolean; // Added disabled prop
+  disabled?: boolean;
+  crumpleIntensity: number;
+  onOriginalFile?: (file: File | null) => void;
 }
 
-export function ImageUpload({ onImageUpload, onImageRemove, isDragging, setIsDragging, disabled = false }: ImageUploadProps) {
+export function ImageUpload({ onImageUpload, onImageRemove, isDragging, setIsDragging, disabled = false, crumpleIntensity, onOriginalFile }: ImageUploadProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper to call backend and update preview
+  const processWithBackend = useCallback(async (file: File, intensity: number) => {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('textureOpacity', intensity.toString());
+    try {
+      const res = await fetch('http://localhost:5000/images/add_border', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Backend error');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+      setFileName(file.name);
+      // Optionally, get image dimensions
+      const img = document.createElement('img');
+      img.onload = () => {
+        onImageUpload(url, img.naturalWidth, img.naturalHeight);
+      };
+      img.src = url;
+    } catch (e) {
+      toast({ title: 'Processing Error', description: 'Could not process image with backend.', variant: 'destructive' });
+    }
+  }, [onImageUpload, toast]);
 
   const processFile = useCallback((file: File | null) => {
-    if (disabled) return; // Prevent processing if disabled
+    if (disabled) return;
     if (file) {
       if (!file.type.startsWith("image/")) {
         toast({
@@ -36,37 +65,24 @@ export function ImageUpload({ onImageUpload, onImageRemove, isDragging, setIsDra
         });
         return;
       }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-
-        const img = document.createElement('img');
-        img.onload = () => {
-          setPreviewUrl(result);
-          setFileName(file.name);
-          onImageUpload(result, img.naturalWidth, img.naturalHeight);
-        };
-        img.onerror = () => {
-          toast({
-            title: "Error Reading Image",
-            description: "Could not determine image dimensions.",
-            variant: "destructive",
-          });
-        };
-        img.src = result;
-      };
-      reader.onerror = () => {
-        toast({
-          title: "Error Reading File",
-          description: "Could not read the selected file.",
-          variant: "destructive",
-        });
-      };
-      reader.readAsDataURL(file);
+      setOriginalFile(file);
+      if (typeof onOriginalFile === 'function') onOriginalFile(file);
+      processWithBackend(file, crumpleIntensity);
     }
-  }, [onImageUpload, toast, disabled]); // Added disabled to dependency array
+  }, [disabled, toast, processWithBackend, crumpleIntensity, onOriginalFile]);
 
+  // Debounced effect for crumpleIntensity
+  React.useEffect(() => {
+    if (!originalFile) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      processWithBackend(originalFile, crumpleIntensity);
+    }, 300); // 300ms debounce
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crumpleIntensity]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (disabled) return;
@@ -82,6 +98,8 @@ export function ImageUpload({ onImageUpload, onImageRemove, isDragging, setIsDra
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    setOriginalFile(null);
+    if (typeof onOriginalFile === 'function') onOriginalFile(null);
     onImageRemove();
   };
 

@@ -1,70 +1,70 @@
 // components/crumpleOverlay.tsx
-import React, { useState } from "react";
+import React, { useEffect, useRef, ReactNode, useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface CrumpleOverlayProps {
   imageSrc: string;
   alt: string;
-  intensity?: number; // Optional prop to control opacity
-  textureOptions?: string[]; // Optional prop for multiple texture variations
+  intensity?: number;
+  animationIntensity?: number;
+  textureOptions?: string[];
+  className?: string;
+  children?: ReactNode;
 }
 
 const CrumpleOverlay: React.FC<CrumpleOverlayProps> = ({
   imageSrc,
   alt,
-  intensity = 0.5, // Default intensity
-  textureOptions = ["studio-master\crumpled-craft-beige-paper.jpg"], // Default texture
+  intensity = 0.5,
+  animationIntensity = 0.5,
+  textureOptions = ["/studio-master/crumpled-craft-beige-paper.jpg"], // Updated path to match the file location
+  className,
+  children,
 }) => {
-  const [selectedTexture, setSelectedTexture] = useState(textureOptions[0]);
-  const [isEffectEnabled, setIsEffectEnabled] = useState(true);
+  const [animationPhase, setAnimationPhase] = useState(0);
+  const animationRef = useRef<number>();
+  const selectedTexture = textureOptions[0];
+
+  // Animation effect
+  useEffect(() => {
+    if (animationIntensity <= 0) return;
+    const animate = () => {
+      setAnimationPhase((prev) => (prev + 0.01) % (Math.PI * 2));
+      animationRef.current = requestAnimationFrame(animate);
+    };
+    animationRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [animationIntensity]);
+
+  // Calculate transform based on animation phase
+  const transform =
+    animationIntensity > 0
+      ? `translate(${Math.sin(animationPhase) * animationIntensity * 2}px, ${
+          Math.cos(animationPhase) * animationIntensity * 2
+        }px) rotate(${Math.sin(animationPhase) * animationIntensity * 0.5}deg)`
+      : "none";
 
   return (
-    <div className="relative inline-block">
-      <img src={imageSrc} alt={alt} className="w-full h-auto" />
-      {isEffectEnabled && (
-        <div
-          className="absolute inset-0 bg-cover bg-center pointer-events-none"
-          style={{
-            backgroundImage: `url(${selectedTexture})`,
-            mixBlendMode: "overlay", // Blending technique
-            opacity: intensity, // Control intensity
-          }}
-        ></div>
-      )}
-      {/* Customization Controls */}
-      <div className="mt-2 flex gap-2">
-        <label>
-          Intensity:
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={intensity}
-            onChange={(e) => setSelectedTexture(e.target.value)}
-          />
-        </label>
-        <label>
-          Texture:
-          <select
-            value={selectedTexture}
-            onChange={(e) => setSelectedTexture(e.target.value)}
-          >
-            {textureOptions.map((texture, index) => (
-              <option key={index} value={texture}>
-                Texture {index + 1}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={isEffectEnabled}
-            onChange={(e) => setIsEffectEnabled(e.target.checked)}
-          />
-          Enable Effect
-        </label>
-      </div>
+    <div className={cn("relative w-full h-full", className)}>
+      {children}
+      {/* Overlay always above children */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: `url(${selectedTexture})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          mixBlendMode: "overlay",
+          opacity: intensity,
+          transform,
+          transformOrigin: "center",
+          zIndex: 10,
+        }}
+      />
     </div>
   );
 };
